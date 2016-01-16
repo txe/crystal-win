@@ -12,6 +12,10 @@ LLVM_CONFIG := $(shell command -v llvm-config-3.6 llvm-config-3.5 llvm-config | 
 LLVM_EXT_DIR = src/llvm/ext
 LLVM_EXT_OBJ = $(LLVM_EXT_DIR)/llvm_ext.o
 
+CK_EXT_DIR = src/ck/ext
+CK_EXT_SOURCES = $(shell find $(CK_EXT_DIR) -name '*.c')
+CK_EXT_OBJ = $(CK_EXT_DIR)/ck_ext.o
+
 all: crystal
 spec: all_spec
 	$(O)/all_spec
@@ -22,19 +26,25 @@ crystal: $(O)/crystal
 all_spec: $(O)/all_spec
 
 llvm_ext: $(LLVM_EXT_OBJ)
+ck_ext: $(CK_EXT_OBJ)
+ext: llvm_ext ck_ext
 
 $(O)/all_spec: $(LLVM_EXT_OBJ) $(SOURCES) $(SPEC_SOURCES)
 	@mkdir -p $(O)
 	$(BUILD_PATH) ./bin/crystal build $(FLAGS) -o $@ spec/all_spec.cr
 
-$(O)/crystal: $(LLVM_EXT_OBJ) $(SOURCES)
+$(O)/crystal: $(LLVM_EXT_OBJ) $(CK_EXT_OBJ) $(SOURCES)
 	@mkdir -p $(O)
 	$(BUILD_PATH) $(EXPORTS) ./bin/crystal build $(FLAGS) -o $@ src/compiler/crystal.cr
 
 $(LLVM_EXT_OBJ): $(LLVM_EXT_DIR)/llvm_ext.cc
 	$(CXX) -c -o $@ $< `$(LLVM_CONFIG) --cxxflags`
 
+$(CK_EXT_OBJ): $(CK_EXT_SOURCES)
+	$(CC) -c -o $@ $< -O3
+
 clean:
 	rm -rf $(O)
 	rm -rf ./doc
 	rm -rf $(LLVM_EXT_OBJ)
+	rm -rf $(CK_EXT_OBJ)

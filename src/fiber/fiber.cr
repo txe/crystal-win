@@ -4,6 +4,8 @@ fun get_stack_top : Void*
   pointerof(dummy) as Void*
 end
 
+require "ck/lib_ck"
+
 class Fiber
   STACK_SIZE = 8 * 1024 * 1024
 
@@ -11,6 +13,12 @@ class Fiber
   @@last_fiber = nil
   @@stack_pool = [] of Void*
   @@fiber_list_mutex = Mutex.new
+  @thread :: Void*
+
+  # @@gc_lock = LibCK.rwlock_init
+  @@gc_lock = LibCK.brlock_init
+  @[ThreadLocal]
+  @@gc_lock_reader = LibCK.brlock_reader_init
 
   protected property :stack_top
   protected property :stack_bottom
@@ -18,6 +26,7 @@ class Fiber
   protected property :prev_fiber
 
   def initialize(&@proc)
+    @thread = Pointer(Void).null
     @stack = Fiber.allocate_stack
     @stack_bottom = @stack + STACK_SIZE
     fiber_main = ->(f : Fiber) { f.run }
@@ -32,16 +41,16 @@ class Fiber
       # In x86-64, the context switch push/pop 7 registers
       @stack_top = (stack_ptr - 7) as Void*
 
-      stack_ptr[0] = fiber_main.pointer  # Initial `resume` will `ret` to this address
-      stack_ptr[-1] = self as Void*      # This will be `pop` into %rdi (first argument)
+      stack_ptr[0] = fiber_main.pointer # Initial `resume` will `ret` to this address
+      stack_ptr[-1] = self as Void*     # This will be `pop` into %rdi (first argument)
     elsif i686
       # In IA32, the context switch push/pops 4 registers.
       # Add two more to store the argument of `fiber_main`
       @stack_top = (stack_ptr - 6) as Void*
 
-      stack_ptr[0] = self as Void*        # First argument passed on the stack
-      stack_ptr[-1] = Pointer(Void).null  # Empty space to keep the stack alignment (16 bytes)
-      stack_ptr[-2] = fiber_main.pointer  # Initial `resume` will `ret` to this address
+      stack_ptr[0] = self as Void*       # First argument passed on the stack
+      stack_ptr[-1] = Pointer(Void).null # Empty space to keep the stack alignment (16 bytes)
+      stack_ptr[-2] = fiber_main.pointer # Initial `resume` will `ret` to this address
     else
       {{ raise "Unsupported platform, only x86_64 and i686 are supported." }}
     end
@@ -57,10 +66,13 @@ class Fiber
   end
 
   def initialize
+    @thread = LibPThread.self as Void*
     @proc = ->{}
     @stack = Pointer(Void).null
     @stack_top = get_stack_top
     @stack_bottom = LibGC.get_stackbottom
+
+    Fiber.gc_register_thread
 
     @@fiber_list_mutex.synchronize do
       if last_fiber = @@last_fiber
@@ -91,7 +103,7 @@ class Fiber
   end
 
   def run
-    GC.enable
+    Fiber.gc_read_unlock
     @proc.call
     @@stack_pool << @stack
 
@@ -119,11 +131,35 @@ class Fiber
     Scheduler.reschedule
   end
 
+  protected def self.gc_register_thread
+    LibCK.brlock_read_register pointerof(@@gc_lock), pointerof(@@gc_lock_reader)
+  end
+
+  protected def self.gc_read_lock
+    # LibCK.rwlock_read_lock pointerof(@@gc_lock)
+    LibCK.brlock_read_lock pointerof(@@gc_lock), pointerof(@@gc_lock_reader)
+  end
+
+  protected def self.gc_read_unlock
+    # LibCK.rwlock_read_unlock pointerof(@@gc_lock)
+    LibCK.brlock_read_unlock pointerof(@@gc_lock_reader)
+  end
+
+  protected def self.gc_write_lock
+    # LibCK.rwlock_write_lock pointerof(@@gc_lock)
+    LibCK.brlock_write_lock pointerof(@@gc_lock)
+  end
+
+  protected def self.gc_write_unlock
+    # LibCK.rwlock_write_unlock pointerof(@@gc_lock)
+    LibCK.brlock_write_unlock pointerof(@@gc_lock)
+  end
+
   @[NoInline]
   @[Naked]
   protected def self.switch_stacks(current, to)
     ifdef x86_64
-      asm (%(
+      asm(%(
         pushq %rdi
         pushq %rbx
         pushq %rbp
@@ -140,9 +176,9 @@ class Fiber
         popq %rbp
         popq %rbx
         popq %rdi)
-      :: "r"(current), "r"(to))
+              :: "r"(current), "r"(to))
     elsif i686
-      asm (%(
+      asm(%(
         pushl %edi
         pushl %ebx
         pushl %ebp
@@ -153,16 +189,23 @@ class Fiber
         popl %ebp
         popl %ebx
         popl %edi)
-      :: "r"(current), "r"(to))
+              :: "r"(current), "r"(to))
     end
   end
 
+  protected def thread=(@thread)
+  end
+
   def resume
-    GC.disable
+    Fiber.gc_read_lock
     current, @@current = @@current, self
-    LibGC.set_stackbottom @stack_bottom
+
+    # LibGC.set_stackbottom LibPThread.self as Void*, @stack_bottom
+    current.thread = Pointer(Void).null
+    self.thread = LibPThread.self as Void*
     Fiber.switch_stacks(pointerof(current.@stack_top), pointerof(@stack_top))
-    GC.enable
+
+    Fiber.gc_read_unlock
   end
 
   def sleep(time)
@@ -206,14 +249,25 @@ class Fiber
 
   @@prev_push_other_roots = LibGC.get_push_other_roots
 
-  # This will push all fibers stacks whenever the GC wants to collect some memory
-  LibGC.set_push_other_roots -> do
-    @@prev_push_other_roots.call
+  LibGC.set_start_callback ->do
+    Fiber.gc_write_lock
+  end
 
+  # This will push all fibers stacks whenever the GC wants to collect some memory
+  LibGC.set_push_other_roots ->do
     fiber = @@first_fiber
     while fiber
-      fiber.push_gc_roots unless fiber == @@current
+      if thread = fiber.@thread
+        # LibC.printf "%lx\n", thread
+        LibGC.set_stackbottom thread, fiber.@stack_bottom
+      else
+        fiber.push_gc_roots
+      end
+
       fiber = fiber.next_fiber
     end
+
+    @@prev_push_other_roots.call
+    Fiber.gc_write_unlock
   end
 end

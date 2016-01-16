@@ -26,6 +26,7 @@ lib LibPThread
   fun exit = pthread_exit(value : Void*)
   fun join = pthread_join(thread : Thread, value : Void**) : Int
   fun detach = pthread_detach(thread : Thread) : Int
+  fun self = pthread_self : Thread
 
   fun mutex_init = pthread_mutex_init(mutex : Mutex*, mutex_attr : MutexAttr*) : Int
   fun mutex_lock = pthread_mutex_lock(mutex : Mutex*) : Int

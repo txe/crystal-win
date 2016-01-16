@@ -12,3 +12,4 @@ all_spec
 /tmp
 /doc/
 /src/llvm/ext/llvm_ext.o
+/src/ck/ext/ck_ext.o
