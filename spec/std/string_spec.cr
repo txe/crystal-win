@@ -1578,4 +1578,17 @@ describe "String" do
       String.build(UInt32::MAX) { }
     end
   end
+
+  describe "encode" do
+    it "raises if wrogn encoding" do
+      expect_raises ArgumentError, "invalid encoding" do
+        "Hello".encode("FOO")
+      end
+    end
+
+    it "encodes" do
+      bytes = "Hello".encode("UCS-2LE")
+      bytes.to_a.should eq([72, 0, 101, 0, 108, 0, 108, 0, 111, 0])
+    end
+  end
 end

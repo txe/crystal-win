@@ -9,22 +9,31 @@ class SimpleMemoryIO
   getter buffer
   getter bytesize
 
-  def initialize(capacity = 64)
+  def initialize(capacity = 64, @max_read = nil)
     @buffer = GC.malloc_atomic(capacity.to_u32) as UInt8*
     @bytesize = 0
     @capacity = capacity
     @pos = 0
   end
 
-  def self.new(string : String)
-    io = new(string.bytesize)
+  def self.new(string : String, max_read = nil)
+    io = new(string.bytesize, max_read: max_read)
     io << string
+    io
+  end
+
+  def self.new(bytes : Slice(UInt8), max_read = nil)
+    io = new(bytes.bytesize, max_read: max_read)
+    io.write(bytes)
     io
   end
 
   def read(slice : Slice(UInt8))
     count = slice.size
     count = Math.min(count, @bytesize - @pos)
+    if max_read = @max_read
+      count = Math.min(count, max_read)
+    end
     slice.copy_from(@buffer + @pos, count)
     @pos += count
     count
@@ -86,7 +95,7 @@ describe IO do
         read.read(slice).should eq(6)
 
         expect_raises(IO::Timeout) do
-          read.read_timeout = 0.0001
+          read.read_timeout = 0.0000001
           read.read(slice)
         end
       end
@@ -370,6 +379,91 @@ describe IO do
       io << "hello world"
       io.skip(6)
       io.gets_to_end.should eq("world")
+    end
+  end
+
+  describe "encoding" do
+    describe "decode" do
+      it "reads into slice" do
+        str = "Hello world"
+        io = SimpleMemoryIO.new(str.encode("UCS-2LE"))
+        io.encoding.should eq("UTF-8")
+        io.encoding = "UCS-2LE"
+        io.encoding.should eq("UCS-2LE")
+        buf = uninitialized UInt8[1024]
+        bytes = io.read_utf8(buf.to_slice)
+        bytes.should eq(str.bytesize)
+        String.new(buf.to_slice[0, bytes]).should eq(str)
+      end
+
+      it "reads into small slice" do
+        str = "Hello world"
+        io = SimpleMemoryIO.new(str.encode("UCS-2LE"))
+        io.encoding = "UCS-2LE"
+        buf = uninitialized UInt8[6]
+
+        bytes = io.read_utf8(buf.to_slice)
+        String.new(buf.to_slice[0, bytes]).should eq("Hello ")
+
+        bytes = io.read_utf8(buf.to_slice)
+        String.new(buf.to_slice[0, bytes]).should eq("world")
+
+        bytes = io.read_utf8(buf.to_slice)
+        bytes.should eq(0)
+      end
+
+      it "reads into small slice, char in half" do
+        str = "Hello world"
+        io = SimpleMemoryIO.new(str.encode("UCS-2LE"), max_read: 3)
+        io.encoding = "UCS-2LE"
+        buf = uninitialized UInt8[6]
+
+        bytes = io.read_utf8(buf.to_slice)
+        String.new(buf.to_slice[0, bytes]).should eq("H")
+
+        bytes = io.read_utf8(buf.to_slice)
+        String.new(buf.to_slice[0, bytes]).should eq("el")
+      end
+
+      it "reads into small slice, char in half" do
+        str = "Hello world" * 200
+        io = SimpleMemoryIO.new(str.encode("UCS-2LE"), max_read: 1022)
+        io.encoding = "UCS-2LE"
+        buf = uninitialized UInt8[1024]
+
+        bytes = io.read_utf8(buf.to_slice)
+        String.new(buf.to_slice[0, bytes]).should eq(str[0, 511])
+
+        bytes = io.read_utf8(buf.to_slice)
+        String.new(buf.to_slice[0, bytes]).should eq(str[511, 511])
+      end
+
+      it "reads into small slice, char in half" do
+        str = "Hello world" * 200
+        io = SimpleMemoryIO.new(str.encode("UCS-2LE"), max_read: 1023)
+        io.encoding = "UCS-2LE"
+        buf = uninitialized UInt8[1024]
+
+        bytes = io.read_utf8(buf.to_slice)
+        String.new(buf.to_slice[0, bytes]).should eq(str[0, 511])
+
+        bytes = io.read_utf8(buf.to_slice)
+        String.new(buf.to_slice[0, bytes]).should eq(str[511, 512])
+      end
+
+      it "gets_to_end" do
+        str = "Hello world" * 200
+        io = SimpleMemoryIO.new(str.encode("UCS-2LE"))
+        io.encoding = "UCS-2LE"
+        io.gets_to_end.should eq(str)
+      end
+
+      it "gets" do
+        str = "Hello world\nThis is a string\nBye"
+        io = SimpleMemoryIO.new(str.encode("UCS-2LE"))
+        io.encoding = "UCS-2LE"
+        io.gets_to_end.should eq(str)
+      end
     end
   end
 end

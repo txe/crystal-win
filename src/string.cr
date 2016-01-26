@@ -924,6 +924,22 @@ class String
     self[0, size - 1]
   end
 
+  def encode(encoding)
+    inbuf_ptr = to_unsafe
+    inbytesleft = LibC::SizeT.new(bytesize)
+    outbuf = uninitialized UInt8[1024]
+    Iconv.new("UTF-8", encoding) do |iconv|
+      io = MemoryIO.new
+      while inbytesleft > 0
+        outbuf_ptr = outbuf.to_unsafe
+        outbytesleft = LibC::SizeT.new(outbuf.size)
+        iconv.convert(pointerof(inbuf_ptr), pointerof(inbytesleft), pointerof(outbuf_ptr), pointerof(outbytesleft))
+        io.write(outbuf.to_slice[0, outbuf.size - outbytesleft])
+      end
+      io.to_slice
+    end
+  end
+
   # Returns a new string with leading and trailing whitespace removed.
   #
   # ```

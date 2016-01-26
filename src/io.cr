@@ -468,7 +468,7 @@ module IO
   def gets_to_end : String
     buffer = uninitialized UInt8[2048]
     String.build do |str|
-      while (read_bytes = read(buffer.to_slice)) > 0
+      while (read_bytes = read_utf8(buffer.to_slice)) > 0
         str.write buffer.to_slice[0, read_bytes]
       end
     end
@@ -775,6 +775,23 @@ module IO
   # ```
   def each_byte
     ByteIterator.new(self)
+  end
+
+  def encoding=(encoding : String)
+    @encoding = encoding == "UTF-8" ? nil : encoding
+  end
+
+  def encoding
+    @encoding || "UTF-8"
+  end
+
+  def read_utf8(slice : Slice(UInt8))
+    if encoding = @encoding
+      decoder = @decoder ||= Decoder.new(encoding)
+      decoder.read_utf8(self, slice)
+    else
+      read(slice)
+    end
   end
 
   # Copy all contents from *src* to *dst*.

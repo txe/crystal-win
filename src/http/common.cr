@@ -38,6 +38,10 @@ module HTTP
           end
         end
 
+        if body && (content_type = headers["Content-Type"]?) && content_type =~ /charset=(.+)/
+          body.encoding = $1
+        end
+
         yield headers, body
         break
       end
