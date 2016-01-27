@@ -415,7 +415,7 @@ module IO
   end
 
   private def read_char_with_bytesize
-    first = read_byte
+    first = read_utf8_byte
     return nil unless first
 
     first = first.to_u32
@@ -434,8 +434,17 @@ module IO
   end
 
   private def read_utf8_masked_byte
-    byte = read_byte || raise "Incomplete UTF-8 byte sequence"
+    byte = read_utf8_byte || raise "Incomplete UTF-8 byte sequence"
     (byte & 0x3f).to_u32
+  end
+
+  def read_utf8_byte : UInt8?
+    byte = uninitialized UInt8
+    if read_utf8(Slice.new(pointerof(byte), 1)) == 1
+      byte
+    else
+      nil
+    end
   end
 
   # Tries to read exactly `slice.size` bytes from this IO into `slice`.

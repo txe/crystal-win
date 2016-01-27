@@ -386,10 +386,10 @@ describe IO do
     describe "decode" do
       it "reads into slice" do
         str = "Hello world"
-        io = SimpleMemoryIO.new(str.encode("UCS-2LE"))
+        io = SimpleMemoryIO.new(str.encode("UCS-2"))
         io.encoding.should eq("UTF-8")
-        io.encoding = "UCS-2LE"
-        io.encoding.should eq("UCS-2LE")
+        io.encoding = "UCS-2"
+        io.encoding.should eq("UCS-2")
         buf = uninitialized UInt8[1024]
         bytes = io.read_utf8(buf.to_slice)
         bytes.should eq(str.bytesize)
@@ -398,8 +398,24 @@ describe IO do
 
       it "reads into small slice" do
         str = "Hello world"
-        io = SimpleMemoryIO.new(str.encode("UCS-2LE"))
-        io.encoding = "UCS-2LE"
+        io = SimpleMemoryIO.new(str.encode("UCS-2"))
+        io.encoding = "UCS-2"
+        buf = uninitialized UInt8[6]
+
+        bytes = io.read_utf8(buf.to_slice)
+        String.new(buf.to_slice[0, bytes]).should eq("Hello ")
+
+        bytes = io.read_utf8(buf.to_slice)
+        String.new(buf.to_slice[0, bytes]).should eq("world")
+
+        bytes = io.read_utf8(buf.to_slice)
+        bytes.should eq(0)
+      end
+
+      it "reads into small slice" do
+        str = "Hello world"
+        io = SimpleMemoryIO.new(str.encode("UCS-2"))
+        io.encoding = "UCS-2"
         buf = uninitialized UInt8[6]
 
         bytes = io.read_utf8(buf.to_slice)
@@ -414,8 +430,8 @@ describe IO do
 
       it "reads into small slice, char in half" do
         str = "Hello world"
-        io = SimpleMemoryIO.new(str.encode("UCS-2LE"), max_read: 3)
-        io.encoding = "UCS-2LE"
+        io = SimpleMemoryIO.new(str.encode("UCS-2"), max_read: 3)
+        io.encoding = "UCS-2"
         buf = uninitialized UInt8[6]
 
         bytes = io.read_utf8(buf.to_slice)
@@ -427,8 +443,8 @@ describe IO do
 
       it "reads into small slice, char in half" do
         str = "Hello world" * 200
-        io = SimpleMemoryIO.new(str.encode("UCS-2LE"), max_read: 1022)
-        io.encoding = "UCS-2LE"
+        io = SimpleMemoryIO.new(str.encode("UCS-2"), max_read: 1022)
+        io.encoding = "UCS-2"
         buf = uninitialized UInt8[1024]
 
         bytes = io.read_utf8(buf.to_slice)
@@ -440,8 +456,8 @@ describe IO do
 
       it "reads into small slice, char in half" do
         str = "Hello world" * 200
-        io = SimpleMemoryIO.new(str.encode("UCS-2LE"), max_read: 1023)
-        io.encoding = "UCS-2LE"
+        io = SimpleMemoryIO.new(str.encode("UCS-2"), max_read: 1023)
+        io.encoding = "UCS-2"
         buf = uninitialized UInt8[1024]
 
         bytes = io.read_utf8(buf.to_slice)
@@ -453,16 +469,38 @@ describe IO do
 
       it "gets_to_end" do
         str = "Hello world" * 200
-        io = SimpleMemoryIO.new(str.encode("UCS-2LE"))
-        io.encoding = "UCS-2LE"
+        io = SimpleMemoryIO.new(str.encode("UCS-2"))
+        io.encoding = "UCS-2"
         io.gets_to_end.should eq(str)
       end
 
-      it "gets" do
-        str = "Hello world\nThis is a string\nBye"
-        io = SimpleMemoryIO.new(str.encode("UCS-2LE"))
-        io.encoding = "UCS-2LE"
-        io.gets_to_end.should eq(str)
+      it "reads char" do
+        str = UInt8[60, 204, 218, 209, 182, 202, 215, 210, 179, 13, 10]
+        slice = Slice.new(str.to_unsafe, str.size)
+
+        io = SimpleMemoryIO.new(slice)
+        io.encoding = "GB2312"
+        # decoded = io.gets_to_end
+
+        buf = uninitialized UInt8[1]
+
+        bytes = [] of UInt8
+        while (size = io.read_utf8(buf.to_slice)) > 0
+          bytes.concat(buf.to_slice[0, size])
+        end
+        p String.new(Slice.new(bytes.to_unsafe, bytes.size))
+        # pp bytes
+        # pp bytes
+
+        # bytes = io.read_utf8(buf.to_slice)
+        # pp bytes
+
+        # io = SimpleMemoryIO.new(slice)
+        # io.encoding = "GB2312"
+        # io.read_char.should eq(decoded[0])
+        # io.read_char.should eq(decoded[1])
+        # line = io.gets
+        # line.should eq(decoded)
       end
     end
   end
