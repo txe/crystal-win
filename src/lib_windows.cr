@@ -55,6 +55,9 @@ lib LibWindows
   fun write_file = WriteFile(file : Handle, buffer : UInt8*, size : DWord, written : DWord*, overlapped : Overlapped*) : Bool
   fun close_handle = CloseHandle(file : Handle) : Bool
 
+  fun get_current_directory = GetCurrentDirectoryA(nBufferLength : DWord,  lpBuffer: UInt8*) : DWord
+
+
   fun create_io_completion_port = CreateIoCompletionPort(file : Handle, port : Handle, data : Void*, threads : DWord) : Handle
   fun get_queued_completion_status = GetQueuedCompletionStatus(port : Handle, bytes_transfered : DWord*, data : Void**, entry : Overlapped**, timeout_millis : DWord) : Bool
   fun post_queued_completion_status = PostQueuedCompletionStatus(port : Handle, bytes_transfered : DWord, data : Void*, entry : Overlapped*) : Bool
