@@ -29,6 +29,7 @@ lib LibWindows
   alias DWord = UInt32
   alias Handle = Void*
   alias SizeT = UInt64 # FIXME
+  alias BOOL = Int32
 
   INVALID_HANDLE_VALUE = Pointer(Void).new((-1).to_u64)
   INFINITY             = 0xFFFFFFFF_u32
@@ -55,8 +56,8 @@ lib LibWindows
   fun write_file = WriteFile(file : Handle, buffer : UInt8*, size : DWord, written : DWord*, overlapped : Overlapped*) : Bool
   fun close_handle = CloseHandle(file : Handle) : Bool
 
-  fun get_current_directory = GetCurrentDirectoryA(nBufferLength : DWord,  lpBuffer: UInt8*) : DWord
-
+  fun get_current_directory = GetCurrentDirectoryA(size : DWord,  buffer: UInt8*) : DWord
+  fun set_current_directory = SetCurrentDirectoryA(pathname: UInt8*) : BOOL
 
   fun create_io_completion_port = CreateIoCompletionPort(file : Handle, port : Handle, data : Void*, threads : DWord) : Handle
   fun get_queued_completion_status = GetQueuedCompletionStatus(port : Handle, bytes_transfered : DWord*, data : Void**, entry : Overlapped**, timeout_millis : DWord) : Bool

@@ -1,7 +1,6 @@
 #require "c/dirent"
 #require "c/unistd"
 #require "c/sys/stat"
-require "lib_windows"
 
 # Objects of class `Dir` are directory streams representing directories in the underlying file system.
 # They provide a variety of ways to list directories and their contents.
@@ -123,8 +122,8 @@ class Dir
 
   # Changes the current working directory of the process to the given string.
   def self.cd(path)
-    if LibC.chdir(path.check_no_null_byte) != 0
-      raise Errno.new("Error while changing directory to #{path.inspect}")
+    if LibWindows.set_current_directory(path.check_no_null_byte) == 0
+      raise WinError.new("Error while changing directory to #{path.inspect}")
     end
   end
 
