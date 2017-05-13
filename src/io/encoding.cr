@@ -93,29 +93,35 @@ module IO
         @out_slice = @out_buffer[0, OUT_BUFFER_SIZE - out_buffer_left]
 
         # Check for errors
-        if result == -1
-          case Errno.value
-          when Errno::EILSEQ
-            # For an illegal sequence we just skip one byte and we'll continue next
+        {% if flag?(:windows) %}
+          if result == -1
             @iconv.handle_invalid(pointerof(@in_buffer), pointerof(@in_buffer_left))
-          when Errno::EINVAL
-            # EINVAL means "An incomplete multibyte sequence has been encountered in the input."
-            old_in_buffer_left = @in_buffer_left
-
-            # On invalid multibyte sequence we try to read more bytes
-            # to see if they complete the sequence
-            refill_in_buffer(io)
-
-            # If we couldn't read anything new, we raise or skip
-            if old_in_buffer_left == @in_buffer_left
-              @iconv.handle_invalid(pointerof(@in_buffer), pointerof(@in_buffer_left))
-            end
+            next
           end
+        {% else %}
+          if result == -1
+            case Errno.value
+            when Errno::EILSEQ
+              # For an illegal sequence we just skip one byte and we'll continue next
+              @iconv.handle_invalid(pointerof(@in_buffer), pointerof(@in_buffer_left))
+            when Errno::EINVAL
+              # EINVAL means "An incomplete multibyte sequence has been encountered in the input."
+              old_in_buffer_left = @in_buffer_left
 
-          # Continue decoding after an error
-          next
-        end
+              # On invalid multibyte sequence we try to read more bytes
+              # to see if they complete the sequence
+              refill_in_buffer(io)
 
+              # If we couldn't read anything new, we raise or skip
+              if old_in_buffer_left == @in_buffer_left
+                @iconv.handle_invalid(pointerof(@in_buffer), pointerof(@in_buffer_left))
+              end
+            end
+            # Continue decoding after an error
+            next
+          end
+        {% end %}
+          
         break
       end
     end

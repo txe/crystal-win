@@ -102,6 +102,8 @@ lib LibWindows
   fun post_queued_completion_status = PostQueuedCompletionStatus(port : Handle, bytes_transfered : DWord, data : Void*, entry : Overlapped*) : Bool
   fun get_current_process = GetCurrentProcess : Handle
   fun get_current_thread = GetCurrentThread : Handle
+  fun create_pipe = CreatePipe(hReadPipe : UInt64*, hWritePipe : UInt64*, lpPipeAttributes : SecurityAttributes*, nSize : DWord) : BOOL
+
 
   WAIT_ABANDONED = 0x00000080_u32
   WAIT_OBJECT_0  = 0x00000000_u32

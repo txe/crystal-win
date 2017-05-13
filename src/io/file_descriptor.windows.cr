@@ -6,7 +6,7 @@ class IO::FileDescriptor
   # :nodoc:
   property overlappeds = Hash(LibWindows::Overlapped*, Fiber?).new
 
-  def initialize(@handle : LibWindows::Handle)
+  def initialize(@handle : LibWindows::Handle, blocking = false)
     @edge_triggerable = false # HACK to make docs build in ci.
     @closed = false
     @pos = 0_u64

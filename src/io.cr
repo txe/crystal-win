@@ -7,6 +7,10 @@ require "c/stdio"
   require "c/unistd"
 {% end %}
 
+
+fun __chkstk
+end
+
 # The `IO` module is the basis for all input and output in Crystal.
 #
 # This module is included by types like `File`, `Socket` and `IO::Memory` and
@@ -217,18 +221,34 @@ module IO
   # reader.gets # => "world"
   # ```
   def self.pipe(read_blocking = false, write_blocking = false)
-    pipe_fds = uninitialized StaticArray(LibC::Int, 2)
-    if LibC.pipe(pipe_fds) != 0
-      raise Errno.new("Could not create pipe")
-    end
+    {% if !flag?(:windows) %}
+      
+      if LibC.pipe(pipe_fds) != 0
+        raise Errno.new("Could not create pipe")
+      end
 
-    r = IO::FileDescriptor.new(pipe_fds[0], read_blocking)
-    w = IO::FileDescriptor.new(pipe_fds[1], write_blocking)
-    r.close_on_exec = true
-    w.close_on_exec = true
-    w.sync = true
+      r = IO::FileDescriptor.new(pipe_fds[0], read_blocking)
+      w = IO::FileDescriptor.new(pipe_fds[1], write_blocking)
+      r.close_on_exec = true
+      w.close_on_exec = true
+      w.sync = true
 
-    {r, w}
+      {r, w}
+    {% else %}
+      pipe_1 : UInt64 = 0_u64
+      pipe_2 : UInt64 = 0_u64
+      if (LibWindows.create_pipe(pointerof(pipe_1), pointerof(pipe_2), nil, 0) == 0)
+        raise WinError.new("Could not create pipe")
+      end
+
+      r = IO::FileDescriptor.new(Pointer(Void).new(pipe_1), read_blocking)
+      w = IO::FileDescriptor.new(Pointer(Void).new(pipe_2), write_blocking)
+      #r.close_on_exec = true
+      #w.close_on_exec = true
+      w.sync = true
+
+      {r, w}
+    {% end %}
   end
 
   # Creates a pair of pipe endpoints (connected to each other) and passes them
