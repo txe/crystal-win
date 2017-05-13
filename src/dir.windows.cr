@@ -1,4 +1,5 @@
 #require "c/dirent"
+#require "errno"
 #require "c/unistd"
 #require "c/sys/stat"
 
@@ -9,6 +10,9 @@
 # the parent directory (`..`), and the directory itself (`.`).
 #
 # See also: `File`.
+fun __chkstk
+end
+
 class Dir
   include Enumerable(String)
   include Iterable(String)
@@ -17,11 +21,10 @@ class Dir
 
   # Returns a new directory object for the named directory.
   def initialize(@path)
-    @dir = LibC.opendir(@path.check_no_null_byte)
-    unless @dir
-      raise Errno.new("Error opening directory '#{@path}'")
+    if !Dir.exists?(@path)
+      raise WinError.new("Error opening directory '#{@path}'")
     end
-    @closed = false
+    @handle = LibWindows::INVALID_HANDLE_VALUE
   end
 
   # Alias for `new(path)`
@@ -79,31 +82,37 @@ class Dir
   # array.sort # => [".", "..", "config.h"]
   # ```
   def read
-    # readdir() returns NULL for failure and sets errno or returns NULL for EOF but leaves errno as is.  wtf.
-    Errno.value = 0
-    ent = LibC.readdir(@dir)
-    if ent
-      String.new(ent.value.d_name.to_unsafe)
-    elsif Errno.value != 0
-      raise Errno.new("readdir")
-    else
-      nil
+    data = LibWindows::WIN32_FIND_DATA_A.new
+    if @handle == LibWindows::INVALID_HANDLE_VALUE
+      @handle = LibWindows.find_first_file((path + "\\*").check_no_null_byte, pointerof(data))
+      if @handle == LibWindows::INVALID_HANDLE_VALUE
+        raise WinError.new("FindFirstFileA")
+      end
+    elsif LibWindows.find_next_file(@handle, pointerof(data)) == 0
+      error = LibWindows.get_last_error()
+      if error == WinError::ERROR_NO_MORE_FILES
+        return nil
+      else
+        raise WinError.new("FindNextFileA", error)
+      end
     end
+    String.new(data.cFileName.to_slice)
   end
 
   # Repositions this directory to the first entry.
   def rewind
-    LibC.rewinddir(@dir)
+    close
     self
   end
 
   # Closes the directory stream.
   def close
-    return if @closed
-    if LibC.closedir(@dir) != 0
-      raise Errno.new("closedir")
+    if @handle != LibWindows::INVALID_HANDLE_VALUE
+      if LibWindows.find_close(@handle) == 0
+        raise WinError.new("FindClose")
+      end
+      @handle = LibWindows::INVALID_HANDLE_VALUE
     end
-    @closed = true
   end
 
   # Returns the current working directory.
@@ -114,9 +123,9 @@ class Dir
     end
     String.new(len) do |buffer|
       if LibWindows.get_current_directory(len, buffer) == 0
-        raise WinError.new("Could not get hostname")
+        raise WinError.new("get_current_directory")
       end
-      {len, len}
+      {len-1, len-1} # remove \0 at the end
     end
   end
 
@@ -161,14 +170,11 @@ class Dir
 
   # Returns `true` if the given path exists and is a directory
   def self.exists?(path) : Bool
-    if LibC.stat(path.check_no_null_byte, out stat) != 0
-      if Errno.value == Errno::ENOENT || Errno.value == Errno::ENOTDIR
-        return false
-      else
-        raise Errno.new("stat")
-      end
+    atr = LibWindows.get_file_attributes(path.check_no_null_byte);
+    if (atr == LibWindows::INVALID_FILE_ATTRIBUTES)
+      return false # raise WinError.new("get_current_directory")
     end
-    File::Stat.new(stat).directory?
+    return atr & LibWindows::FILE_ATTRIBUTE_DIRECTORY != 0
   end
 
   # Returns `true` if the directory at *path* is empty, otherwise returns `false`.
@@ -181,7 +187,7 @@ class Dir
   # Dir.empty?("bar") # => false
   # ```
   def self.empty?(path) : Bool
-    raise Errno.new("Error determining size of '#{path}'") unless exists?(path)
+    raise WinError.new("Error determining size of '#{path}'") unless Dir.exists?(path)
 
     foreach(path) do |f|
       return false unless {".", ".."}.includes?(f)
@@ -192,8 +198,8 @@ class Dir
   # Creates a new directory at the given path. The linux-style permission mode
   # can be specified, with a default of 777 (0o777).
   def self.mkdir(path, mode = 0o777)
-    if LibC.mkdir(path.check_no_null_byte, mode) == -1
-      raise Errno.new("Unable to create directory '#{path}'")
+    if LibWindows.create_directory(path.check_no_null_byte, nil) == 0
+      raise WinError.new("Unable to create directory '#{path}'")
     end
     0
   end
@@ -222,8 +228,8 @@ class Dir
 
   # Removes the directory at the given path.
   def self.rmdir(path)
-    if LibC.rmdir(path.check_no_null_byte) == -1
-      raise Errno.new("Unable to remove directory '#{path}'")
+    if LibWindows.remove_directory(path.check_no_null_byte) == 0
+      raise WinError.new("Unable to remove directory '#{path}'")
     end
     0
   end
