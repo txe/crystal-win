@@ -92,11 +92,24 @@ lib LibWindows
   FILE_ATTRIBUTE_TEMPORARY      = 256_i32
   INVALID_FILE_ATTRIBUTES       = -1_i32
   
+  FILE_BEGIN                    = 0_i32
+  FILE_CURRENT                  = 1_i32
+  FILE_END                      = 2_i32
+  INVALID_SET_FILE_POINTER      = (-1).to_u32
+
   fun find_first_file = FindFirstFileA(fileName: UInt8*, filedata: WIN32_FIND_DATA_A*) : Handle
   fun find_next_file = FindNextFileA(file: Handle, filedata: WIN32_FIND_DATA_A*) : BOOL
   fun find_close = FindClose(file: Handle) : BOOL
   fun get_file_attributes = GetFileAttributesA(filename : UInt8*) : DWord;
-
+  fun get_file_size_ex = GetFileSizeEx(file : Handle, size : UInt64*) : BOOL
+  fun set_file_pointer = SetFilePointer(file : Handle, lDistanceToMove : Long, lpDistanceToMoveHigh : Long*, dwMoveMethod : DWord) : DWord
+  fun set_end_of_file = SetEndOfFile(file : Handle) : BOOL
+  fun delete_file = DeleteFileA(filename : UInt8*) : BOOL
+  fun get_full_path_name = GetFullPathNameA(filename : UInt8*, buf_len : DWord, lpBuffer : UInt8*, lpFilePart : UInt8**) : DWord
+  # from Shlwapi.lib
+  # fun path_file_dir_exists = PathFileExistsA(path : UInt8*) : BOOL
+  fun move_file = MoveFileA(lpExistingFileName : UInt8*, lpNewFileName : UInt8*) : BOOL
+  
   fun create_io_completion_port = CreateIoCompletionPort(file : Handle, port : Handle, data : Void*, threads : DWord) : Handle
   fun get_queued_completion_status = GetQueuedCompletionStatus(port : Handle, bytes_transfered : DWord*, data : Void**, entry : Overlapped**, timeout_millis : DWord) : Bool
   fun post_queued_completion_status = PostQueuedCompletionStatus(port : Handle, bytes_transfered : DWord, data : Void*, entry : Overlapped*) : Bool

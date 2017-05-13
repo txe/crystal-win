@@ -24,10 +24,10 @@ class IO::FileDescriptor
   # end
 
   def stat
-    if LibC.fstat(@handle, out stat) != 0
-      raise Errno.new("Unable to get stat")
+    if @handle == LibWindows::INVALID_HANDLE_VALUE
+      raise WinError.new("Unable to get stat")
     end
-    File::Stat.new(stat)
+    File::Stat.new(@path, @handle)
   end
 
   # Seeks to a given *offset* (in bytes) according to the *whence* argument.

@@ -8,17 +8,22 @@ class File < IO::FileDescriptor
   # The file/directory separator string. "/" in Unix, "\\" in Windows.
   SEPARATOR_STRING = "\\"
 
+  # :nodoc:
+  DEFAULT_CREATE_MODE = 0
+  
   def initialize(filename : String, mode = "r", encoding = nil, invalid = nil)
     access, creation, seek = open_flag(mode)
     flags = LibWindows::FILE_FLAG_OVERLAPPED
-    handle = LibWindows.create_file(filename, access, 0, nil, creation, flags, nil)
+    handle = LibWindows.create_file(filename.check_no_null_byte, access, 0, nil, creation, flags, nil)
 
-    if handle.null?
+    if handle == LibWindows::INVALID_HANDLE_VALUE
       raise WinError.new("Error opening file '#{filename}' with mode '#{mode}'")
     end
 
     if seek
-      # SEEK_END
+      if LibWindows.set_file_pointer(handle, 0, nil, LibWindows::FILE_END) == LibWindows::INVALID_SET_FILE_POINTER
+        raise WinError.new("set_file_pointer")
+      end
     end
 
     @path = filename
@@ -78,10 +83,7 @@ class File < IO::FileDescriptor
   # File.stat("foo").mtime # => 2015-09-23 06:24:19 UTC
   # ```
   def self.stat(path) : Stat
-    if LibC.stat(path.check_no_null_byte, out stat) != 0
-      raise Errno.new("Unable to get stat for '#{path}'")
-    end
-    Stat.new(stat)
+    Stat.new(path)
   end
 
   # Returns a `File::Stat` object for the file given by *path* or raises
@@ -174,14 +176,11 @@ class File < IO::FileDescriptor
   # File.file?("foobar") # => false
   # ```
   def self.file?(path) : Bool
-    if LibC.stat(path.check_no_null_byte, out stat) != 0
-      if Errno.value == Errno::ENOENT
-        return false
-      else
-        raise Errno.new("stat")
-      end
+    atr = LibWindows.get_file_attributes(path.check_no_null_byte);
+    if atr == LibWindows::INVALID_FILE_ATTRIBUTES || (atr & LibWindows::FILE_ATTRIBUTE_DIRECTORY) > 0
+      return false
     end
-    File::Stat.new(stat).file?
+    return true;
   end
 
   # Returns `true` if the given *path* exists and is a directory.
@@ -300,9 +299,8 @@ class File < IO::FileDescriptor
   # File.delete("./bar") # raises Errno (No such file or directory)
   # ```
   def self.delete(path)
-    err = LibC.unlink(path.check_no_null_byte)
-    if err == -1
-      raise Errno.new("Error deleting file '#{path}'")
+    if LibWindows.delete_file(path.check_no_null_byte) == 0
+      raise WinError.new("Error deleting file '#{path}'")
     end
   end
 
@@ -374,9 +372,17 @@ class File < IO::FileDescriptor
 
   # Resolves the real path of *path* by following symbolic links.
   def self.real_path(path) : String
-    real_path_ptr = LibC.realpath(path, nil)
-    raise Errno.new("Error resolving real path of #{path}") unless real_path_ptr
-    String.new(real_path_ptr).tap { LibC.free(real_path_ptr.as(Void*)) }
+    path.check_no_null_byte
+    buf = uninitialized StaticArray(UInt8, 260)
+    len = LibWindows.get_full_path_name(path, 260, buf, nil)
+    if len == 0 || len > 260
+      raise WinError.new("Error resolving real path of #{path}")
+    end
+    path = String.new(Slice.new(buf.to_unsafe, len))
+    # if LibWindows.path_file_dir_exists(path) == 0
+    #   raise WinError.new("Error resolving real path of #{path}")
+    # end
+    path
   end
 
   # Creates a new link (also known as a hard link) at *new_path* to an existing file
@@ -497,7 +503,7 @@ class File < IO::FileDescriptor
   # representation of *content* will be written (the result of invoking `to_s`
   # on *content*)
   def self.write(filename, content, perm = DEFAULT_CREATE_MODE, encoding = nil, invalid = nil)
-    File.open(filename, "w", perm, encoding: encoding, invalid: invalid) do |file|
+    File.open(filename, "w", encoding: encoding, invalid: invalid) do |file|
       case content
       when Bytes
         file.write(content)
@@ -567,11 +573,9 @@ class File < IO::FileDescriptor
   # File.exists?("afile.cr") # => true
   # ```
   def self.rename(old_filename, new_filename)
-    code = LibC.rename(old_filename.check_no_null_byte, new_filename.check_no_null_byte)
-    if code != 0
-      raise Errno.new("Error renaming file '#{old_filename}' to '#{new_filename}'")
+    if LibWindows.move_file(old_filename.check_no_null_byte, new_filename.check_no_null_byte) == 0
+      raise WinError.new("Error renaming file '#{old_filename}' to '#{new_filename}'")
     end
-    code
   end
 
   # Sets the access and modification times of *filename*.
@@ -601,11 +605,12 @@ class File < IO::FileDescriptor
   # for writing.
   def truncate(size = 0)
     flush
-    code = LibC.ftruncate(fd, size)
-    if code != 0
-      raise Errno.new("Error truncating file '#{path}'")
+    if LibWindows.set_file_pointer(@handle, size, nil, FILE_BEGIN) == 0
+      raise WinError.new("Error truncating file '#{path}'")
     end
-    code
+    if LibWindows.set_end_of_file(@handle) == 0
+      raise WinError.new("Error truncating file '#{path}'")
+    end
   end
 
   # Yields an `IO` to read a section inside this file.

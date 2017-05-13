@@ -172,7 +172,7 @@ class Dir
   def self.exists?(path) : Bool
     atr = LibWindows.get_file_attributes(path.check_no_null_byte);
     if (atr == LibWindows::INVALID_FILE_ATTRIBUTES)
-      return false # raise WinError.new("get_current_directory")
+      return false
     end
     return atr & LibWindows::FILE_ATTRIBUTE_DIRECTORY != 0
   end
