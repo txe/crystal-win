@@ -10,12 +10,22 @@ module System
   # System.hostname # => "host.example.org"
   # ```
   def self.hostname
-    String.new(255) do |buffer|
-      unless LibC.gethostname(buffer, LibC::SizeT.new(255)) == 0
-        raise Errno.new("Could not get hostname")
+    {% if !flag?(:windows) %}
+      String.new(255) do |buffer|
+        unless LibC.gethostname(buffer, LibC::SizeT.new(255)) == 0
+          raise Errno.new("Could not get hostname")
+        end
+        len = LibC.strlen(buffer)
+        {len, len}
       end
-      len = LibC.strlen(buffer)
-      {len, len}
-    end
+    {% else %}
+      len : LibWindows::DWord = 255_u32
+      String.new(255) do |buffer|
+        if LibWindows.get_computer_name(buffer, pointerof(len)) == 0
+          raise WinError.new("Could not get hostname")
+        end
+        {len, len}
+      end
+    {% end %}
   end
 end

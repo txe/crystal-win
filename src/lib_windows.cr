@@ -186,6 +186,9 @@ lib LibWindows
 
   fun get_time_zone_information = GetTimeZoneInformation(tz_info : TimeZoneInformation*) : DWord
   fun get_system_time_as_file_time = GetSystemTimeAsFileTime(time : FileTime*)
+
+
+  fun get_computer_name = GetComputerNameA(buffer : UInt8*, size : DWord*) : BOOL
 end
 
 require "winerror.cr"
