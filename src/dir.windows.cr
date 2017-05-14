@@ -10,9 +10,6 @@
 # the parent directory (`..`), and the directory itself (`.`).
 #
 # See also: `File`.
-fun __chkstk
-end
-
 class Dir
   include Enumerable(String)
   include Iterable(String)

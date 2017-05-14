@@ -11,6 +11,7 @@ lib LibC
   fun atof(nptr : Char*) : Double
   fun div(numer : Int, denom : Int) : DivT
   fun exit(status : Int) : NoReturn
+  fun _exit(status : Int) : NoReturn
   fun free(ptr : Void*) : Void
   fun getenv(name : Char*) : Char*
   fun malloc(size : SizeT) : Void*

@@ -8,9 +8,6 @@ require "c/stdio"
 {% end %}
 
 
-fun __chkstk
-end
-
 # The `IO` module is the basis for all input and output in Crystal.
 #
 # This module is included by types like `File`, `Socket` and `IO::Memory` and

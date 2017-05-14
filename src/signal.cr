@@ -126,4 +126,7 @@ fun __crystal_sigfault_handler(sig : LibC::Int, addr : Void*)
   LibC._exit sig
 end
 
-LibExt.setup_sigfault_handler
+# TODO compile sigfault.c for windows
+{% if !flag?(:windows) %}
+  LibExt.setup_sigfault_handler
+{% end %}
