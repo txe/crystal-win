@@ -164,11 +164,11 @@ end
 {% if flag?(:windows) %}
   # :nodoc:
   @[Raises]
-  fun __crystal_raise(ex : Exception) : NoReturn
+  fun __crystal_raise(ex : Void*) : NoReturn
     ti = WindowsExt.throw_info.as(Pointer({Int32, Int32, Int32, Int32}))
-    LibWindows.cxx_throw_exception(pointerof(ex).as(Void*), ti)
-    LibC.printf "Failed to raise an exception: %s\n", ret.to_s
-    LibC.exit(ret)    
+    LibWindows.cxx_throw_exception(ex, ti)
+    LibC.printf "Failed to raise an exception \n"
+    LibC.exit(1)    
   end
 {% else %}
   # :nodoc:
@@ -188,7 +188,7 @@ end
 
 def raise(ex : Exception) : NoReturn
   {% if flag?(:windows) %}
-    __crystal_raise(ex)
+    __crystal_raise(pointerof(ex).as(Void*))
   {% else %}
     ex.callstack = CallStack.new
     unwind_ex = Pointer(LibUnwind::Exception).malloc
