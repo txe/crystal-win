@@ -63,11 +63,11 @@ class LLVM::Builder
     Value.new LibLLVM.build_call(self, func, pointerof(value), 1, name)
   end
 
-  def call(func, args : Array(LLVM::Value), name : String = "")
+  def call(func, args : Array(LLVM::Value), name : String = "", bundle : LLVM::OperandBundleDef = LLVM::OperandBundleDef.null)
     # check_func(func)
     # check_values(args)
 
-    Value.new LibLLVM.build_call(self, func, (args.to_unsafe.as(LibLLVM::ValueRef*)), args.size, name)
+    Value.new LibLLVMExt.build_call(self, func, (args.to_unsafe.as(LibLLVM::ValueRef*)), args.size, bundle, name)
   end
 
   def alloca(type, name = "")
