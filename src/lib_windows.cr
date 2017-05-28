@@ -189,6 +189,8 @@ lib LibWindows
 
 
   fun get_computer_name = GetComputerNameA(buffer : UInt8*, size : DWord*) : BOOL
+
+  fun cxx_throw_exception = _CxxThrowException(exception_object : Void*, throw_info : Void*) : NoReturn
 end
 
 require "winerror.cr"
