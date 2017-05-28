@@ -130,6 +130,7 @@ module Crystal
     @argv : LLVM::Value
     @empty_md_list : LLVM::Value
     @rescue_block : LLVM::BasicBlock?
+    @catch_pad : LLVM::Value?
     @malloc_fun : LLVM::Function?
     @malloc_atomic_fun : LLVM::Function?
     @sret_value : LLVM::Value?
@@ -1504,7 +1505,7 @@ module Crystal
       old_rescue_block = @rescue_block
       old_entry_block = @entry_block
       old_alloca_block = @alloca_block
-      old_needs_value = @needs_value
+      old_needs_value = @needs_value      
       @llvm_mod = @main_mod
       @llvm_context = @main_llvm_context
       @llvm_typer = @main_llvm_typer
