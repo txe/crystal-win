@@ -161,27 +161,34 @@ end
   end
 {% end %}
 
-# :nodoc:
-@[Raises]
-fun __crystal_raise(unwind_ex : LibUnwind::Exception*) : NoReturn
-  ret = LibUnwind.raise_exception(unwind_ex)
-  LibC.printf "Failed to raise an exception: %s\n", ret.to_s
-  CallStack.print_backtrace
-  LibC.exit(ret)
-end
+{% if flag?(:windows) %}
+  # :nodoc:
+  @[Raises]
+  fun __crystal_raise(ex : Exception) : NoReturn
+    ti = WindowsExt.throw_info.as(Pointer({Int32, Int32, Int32, Int32}))
+    LibWindows.cxx_throw_exception(pointerof(ex).as(Void*), ti)
+    LibC.printf "Failed to raise an exception: %s\n", ret.to_s
+    LibC.exit(ret)    
+  end
+{% else %}
+  # :nodoc:
+  @[Raises]
+  fun __crystal_raise(unwind_ex : LibUnwind::Exception*) : NoReturn
+    ret = LibUnwind.raise_exception(unwind_ex)
+    LibC.printf "Failed to raise an exception: %s\n", ret.to_s
+    CallStack.print_backtrace
+    LibC.exit(ret)
+  end
 
-# :nodoc:
-fun __crystal_get_exception(unwind_ex : LibUnwind::Exception*) : UInt64
-  unwind_ex.value.exception_object
-end
+  # :nodoc:
+  fun __crystal_get_exception(unwind_ex : LibUnwind::Exception*) : UInt64
+    unwind_ex.value.exception_object
+  end
+{% end %}
 
 def raise(ex : Exception) : NoReturn
   {% if flag?(:windows) %}
-    data = ex.inspect_with_backtrace.to_slice
-    count = data.size
-    stderr = LibWindows.get_std_handle(LibWindows::STD_ERROR_HANDLE)
-    LibWindows.write_file(stderr, data.pointer(count), count, nil, nil)
-    LibC.exit 1
+    __crystal_raise(ex)
   {% else %}
     ex.callstack = CallStack.new
     unwind_ex = Pointer(LibUnwind::Exception).malloc

@@ -193,6 +193,12 @@ lib LibWindows
   fun cxx_throw_exception = _CxxThrowException(exception_object : Void*, throw_info : Void*) : NoReturn
 end
 
+module WindowsExt
+  @[Primitive(:throw_info)]
+  def self.throw_info : Void*
+  end
+end
+
 require "winerror.cr"
 
 data = uninitialized LibWindows::WSAData
