@@ -32,7 +32,9 @@ require "dir"
 require "enum"
 require "enumerable"
 require "env"
-require "errno"
+{% if !flag?(:windows) %}
+  require "errno"
+{% end %}
 require "ext"
 require "file"
 require "float"
@@ -63,7 +65,9 @@ require "reference"
 require "reflect"
 require "regex"
 require "set"
-require "signal"
+{% if !flag?(:windows) %}
+  require "signal"
+{% end %}
 require "slice"
 require "static_array"
 require "struct"
