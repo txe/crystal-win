@@ -113,7 +113,7 @@ end
 
     __crystal_continue_unwind
   end
-{% else %}
+{% elsif !flag?(:windows) %}
   # :nodoc:
   fun __crystal_personality(version : Int32, actions : LibUnwind::Action, exception_class : UInt64, exception_object : LibUnwind::Exception*, context : Void*) : LibUnwind::ReasonCode
     start = LibUnwind.get_region_start(context)

@@ -25,8 +25,11 @@ class Scheduler
   def self.attach_to_completion_port(handle, fd) : Bool
     if LibWindows.create_io_completion_port(handle, Scheduler.completion_port, fd.as(Void*), 0).null?
       if LibWindows.get_last_error == WinError::ERROR_INVALID_PARAMETER
-        # It is allowed to fail if the handle doesn't have FILE_FLAG_OVERLAPPED.
+        # FIXME: It is allowed to fail if the handle doesn't have FILE_FLAG_OVERLAPPED.
         # But better check before calling. How to check for if the flag is set on the handle?
+
+        # if not to remove eror then some condition can trigger
+        LibWindows.set_last_error 0
         return false
       end
 
