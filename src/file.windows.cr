@@ -163,7 +163,7 @@ class File < IO::FileDescriptor
 
   # Convenience method to avoid code on LibC.access calls. Not meant to be called by users of this class.
   private def self.accessible?(path, flag)
-    LibC.access(path.check_no_null_byte, flag) == 0
+    LibC._access(path.check_no_null_byte, flag) == 0
   end
 
   # Returns `true` if given *path* exists and is a file.
@@ -437,7 +437,8 @@ class File < IO::FileDescriptor
   def self.read(filename, encoding = nil, invalid = nil) : String
     File.open(filename, "r") do |file|
       if encoding
-        file.set_encoding(encoding, invalid: invalid)
+        # FIXME
+        #file.set_encoding(encoding, invalid: invalid)
         file.gets_to_end
       else
         # We try to read a string with an initialize capacity
@@ -580,12 +581,12 @@ class File < IO::FileDescriptor
 
   # Sets the access and modification times of *filename*.
   def self.utime(atime : Time, mtime : Time, filename : String) : Nil
-    timevals = uninitialized LibC::Timeval[2]
-    timevals[0] = to_timeval(atime)
-    timevals[1] = to_timeval(mtime)
-    ret = LibC.utimes(filename, timevals)
+    times = uninitialized LibC::Utimebuf64
+    times.actime = atime.to_local.epoch
+    times.modtime = mtime.to_local.epoch
+    ret = LibC._utime64(filename.check_no_null_byte, pointerof(times))
     if ret != 0
-      raise Errno.new("Error setting time to file '#{filename}'")
+      raise Errno.new("Error setting time to file '#{filename}', #{ret}")
     end
   end
 
@@ -596,13 +597,6 @@ class File < IO::FileDescriptor
   def self.touch(filename : String, time : Time = Time.now)
     open(filename, "a") { } unless exists?(filename)
     utime time, time, filename
-  end
-
-  private def self.to_timeval(time : Time)
-    t = uninitialized LibC::Timeval
-    t.tv_sec = typeof(t.tv_sec).new(time.to_local.epoch)
-    t.tv_usec = typeof(t.tv_usec).new(0)
-    t
   end
 
   # Return the size in bytes of the currently opened file.

@@ -28,12 +28,18 @@ lib LibC
     tv_nsec : Long
   end
 
+  struct Utimebuf64
+    actime : UInt64
+    modtime : UInt64
+  end
+
   fun gmtime_r(timer : TimeT*, tp : Tm*) : Tm*
   fun localtime_r(timer : TimeT*, tp : Tm*) : Tm*
   fun mktime(tp : Tm*) : TimeT
   fun tzset : Void
   fun timegm(tp : Tm*) : TimeT
-
+  fun _utime64(filename : UInt8*, times : Utimebuf64*) : Int32
+  
   $daylight : Int
   $timezone : Long
   $tzname : StaticArray(Char*, 2)
