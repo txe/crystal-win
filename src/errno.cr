@@ -13,6 +13,10 @@ lib LibC
     fun __error : Int*
   {% elsif flag?(:openbsd) %}
     fun __error = __errno : Int*
+  {% elsif flag?(:windows) %}
+    fun _get_errno = _get_errno(value : Int32*) : Int32
+    fun _set_errno = _set_errno(value : Int32) : Int32
+    fun strerror_s = strerror_s(buffer : UInt8*, numberOfElements : SizeT, errnum : Int32) : Int
   {% end %}
 end
 
@@ -214,7 +218,7 @@ class Errno < Exception
   # ```
   def initialize(message, errno = Errno.value)
     @errno = errno
-    super "#{message}: #{String.new(LibC.strerror(errno))}"
+    super "#{message}: #{strerror(errno)}"
   end
 
   # Returns the value of libc's errno.
@@ -227,6 +231,10 @@ class Errno < Exception
       {% end %}
     {% elsif flag?(:darwin) || flag?(:freebsd) || flag?(:openbsd) %}
       LibC.__error.value
+    {% elsif flag?(:windows) %}
+      val : Int32 = -1
+      LibC._get_errno(pointerof(val))
+      val
     {% end %}
   end
 
@@ -240,6 +248,22 @@ class Errno < Exception
       {% end %}
     {% elsif flag?(:darwin) || flag?(:freebsd) || flag?(:openbsd) %}
       LibC.__error.value = value
+    {% elsif flag?(:windows) %}
+       LibC._set_errno(value)
+    {% end %}
+  end
+
+  # Return the message denoted by errno
+  private def strerror(errno)
+    {% if flag?(:windows) %}
+      # FIXME: use _wcserror_s
+      String.new(255) do |buffer|
+        LibC.strerror_s(buffer, 255, errno)
+        len = LibC.strlen(buffer)
+        {len, len}
+      end
+    {% else %}
+      String.new(LibC.strerror(errno))
     {% end %}
   end
 end

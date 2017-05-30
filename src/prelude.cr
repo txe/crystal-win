@@ -32,9 +32,7 @@ require "dir"
 require "enum"
 require "enumerable"
 require "env"
-{% if !flag?(:windows) %}
-  require "errno"
-{% end %}
+require "errno"
 require "ext"
 require "file"
 require "float"
