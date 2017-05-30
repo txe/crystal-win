@@ -1,9 +1,8 @@
+require "./sys/types"
+
 lib LibC
   CLOCK_MONOTONIC = 1
   CLOCK_REALTIME  = 0
-
-  alias SusecondsT = Long
-  alias TimeT = Long
 
   struct Timeval
     tv_sec : TimeT

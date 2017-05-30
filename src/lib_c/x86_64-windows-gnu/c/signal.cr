@@ -1,4 +1,4 @@
-#require "./sys/types"
+require "./sys/types"
 require "./time"
 require "./stdlib"
 
@@ -36,8 +36,6 @@ lib LibC
   SIGPWR    = 30
   SIGSTKFLT = 16
   SIGUNUSED = 31
-
-  alias PidT = Int
 
   fun kill(pid : PidT, sig : Int) : Int
   fun signal(sig : Int, handler : Int -> Void) : Int -> Void
