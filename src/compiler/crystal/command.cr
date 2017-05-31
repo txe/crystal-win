@@ -63,37 +63,57 @@ class Crystal::Command
       case
       when "init".starts_with?(command)
         options.shift
-        init
+        {% if !flag?(:windows) %}
+          init
+        {% end %}
       when "build".starts_with?(command), "compile".starts_with?(command)
         if "compile".starts_with?(command)
           STDERR.puts "Deprecation: The compile command was renamed to build and will be removed in a future version."
         end
         options.shift
-        build
+        {% if !flag?(:windows) %}
+          build
+        {% end %}
       when "play".starts_with?(command)
         options.shift
-        playground
+        {% if !flag?(:windows) %}
+          playground
+        {% end %}
       when "deps".starts_with?(command)
         options.shift
-        deps
+        {% if !flag?(:windows) %}
+          deps
+        {% end %}
       when "docs".starts_with?(command)
         options.shift
-        docs
+        {% if !flag?(:windows) %}
+          docs
+        {% end %}
       when command == "env"
         options.shift
-        env
+        {% if !flag?(:windows) %}
+          env
+        {% end %}
       when command == "eval"
         options.shift
-        eval
+        {% if !flag?(:windows) %}
+          eval
+        {% end %}
       when "run".starts_with?(command)
         options.shift
-        run_command(single_file: false)
+        {% if !flag?(:windows) %}
+          run_command(single_file: false)
+        {% end %}
       when "spec/".starts_with?(command)
         options.shift
-        spec
+        {% if !flag?(:windows) %}
+          spec
+        {% end %}
       when "tool".starts_with?(command)
         options.shift
-        tool
+        {% if !flag?(:windows) %}
+          tool
+        {% end %}
       when "help".starts_with?(command), "--help" == command, "-h" == command
         puts USAGE
         exit
