@@ -18,7 +18,11 @@ class Process
 
   # Returns the process identifier of the current process.
   def self.pid : LibC::PidT
-    LibC.getpid
+    {% if flag?(:windows) %}
+      raise Exception.new("getpid is not implemented")
+    {% else %}
+      LibC.getpid
+    {% end %}
   end
 
   # Returns the process group identifier of the current process.
@@ -120,15 +124,19 @@ class Process
   # *run_hooks* should ALWAYS be `true` unless `exec` is used immediately after fork.
   # Channels, `IO` and other will not work reliably if *run_hooks* is `false`.
   protected def self.fork_internal(run_hooks : Bool = true)
-    pid = LibC.fork
-    case pid
-    when 0
-      pid = nil
-      Process.after_fork_child_callbacks.each(&.call) if run_hooks
-    when -1
-      raise Errno.new("fork")
-    end
-    pid
+    {% if flag?(:windows) %}
+      raise Errno.new("fork not implemented")
+    {% else %}
+      pid = LibC.fork
+      case pid
+      when 0
+        pid = nil
+        Process.after_fork_child_callbacks.each(&.call) if run_hooks
+      when -1
+        raise Errno.new("fork")
+      end
+      pid
+    {% end %}
   end
 
   # The standard `IO` configuration of a process:
@@ -198,7 +206,7 @@ class Process
   # By default the process is configured without input, output or error.
   def initialize(command : String, args = nil, env : Env = nil, clear_env : Bool = false, shell : Bool = false, input : Stdio = false, output : Stdio = false, error : Stdio = false, chdir : String? = nil)
     command, argv = Process.prepare_argv(command, args, shell)
-
+    
     @wait_count = 0
 
     if needs_pipe?(input)
@@ -231,24 +239,29 @@ class Process
       end
     end
 
-    @pid = Process.fork_internal(run_hooks: false) do
-      begin
-        Process.exec_internal(
-          command,
-          argv,
-          env,
-          clear_env,
-          fork_input || input,
-          fork_output || output,
-          fork_error || error,
-          chdir
-        )
-      rescue ex
-        ex.inspect_with_backtrace STDERR
-      ensure
-        LibC._exit 127
+    @pid = -1
+    {% if flag?(:windows) %}  
+      raise Errno.new("not implemented")
+    {% else %}
+      @pid = Process.fork_internal(run_hooks: false) do
+        begin
+          Process.exec_internal(
+            command,
+            argv,
+            env,
+            clear_env,
+            fork_input || input,
+            fork_output || output,
+            fork_error || error,
+            chdir
+          )
+        rescue ex
+          ex.inspect_with_backtrace STDERR
+        ensure
+          LibC._exit 127
+        end
       end
-    end
+    {% end %}
 
     @waitpid_future = Event::SignalChildHandler.instance.waitpid(pid)
 
@@ -448,11 +461,15 @@ end
 # `echo hi` # => "hi\n"
 # ```
 def `(command) : String
-  process = Process.new(command, shell: true, input: true, output: nil, error: true)
-  output = process.output.gets_to_end
-  status = process.wait
-  $? = status
-  output
+  {% if flag?(:windows) %}
+    raise Errno.new("not implemented")
+  {% else %}
+    process = Process.new(command, shell: true, input: true, output: nil, error: true)
+    output = process.output.gets_to_end
+    status = process.wait
+    $? = status
+    output
+  {% end %}
 end
 
 # See also: `Process.fork`

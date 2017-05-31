@@ -26,21 +26,28 @@ class Event::SignalChildHandler
     @waiting.clear
   end
 
-  def trigger
-    loop do
-      pid = LibC.waitpid(-1, out exit_code, LibC::WNOHANG)
-      case pid
-      when 0
-        return nil
-      when -1
-        raise Errno.new("waitpid") unless Errno.value == Errno::ECHILD
-        return nil
-      else
-        status = Process::Status.new exit_code
-        send_pending pid, status
+  {% if flag?(:windows) %}
+    def trigger
+      raise Errno.new("trigger not implemented")
+      return nil
+    end
+  {% else %}
+    def trigger
+      loop do
+        pid = LibC.waitpid(-1, out exit_code, LibC::WNOHANG)
+        case pid
+        when 0
+          return nil
+        when -1
+          raise Errno.new("waitpid") unless Errno.value == Errno::ECHILD
+          return nil
+        else
+          status = Process::Status.new exit_code
+          send_pending pid, status
+        end
       end
     end
-  end
+  {% end %}
 
   private def send_pending(pid, status)
     # BUG: needs mutexes with threads
