@@ -63,13 +63,15 @@ class File
     #   mode & 0o7777
     # end
 
-    # def mtime
-    #   {% if flag?(:darwin) %}
-    #     time @stat.st_mtimespec
-    #   {% else %}
-    #     time @stat.st_mtim
-    #   {% end %}
-    # end
+    def mtime : Time
+      last_write_time = uninitialized LibWindows::FILETIME
+      get_handle do | handle |
+        if 0 == LibWindows.get_file_time(handle, nil, nil, pointerof(last_write_time))
+          raise WinError.new("get_file_time")
+        end
+      end
+      time (win_to_unix_epoch last_write_time)
+    end
 
     # def nlink
     #   @stat.st_nlink
@@ -184,8 +186,17 @@ class File
     #   (@stat.st_mode & LibC::S_IFMT) == LibC::S_ISVTX
     # end
 
-    # private def time(value)
-    #   Time.new value, Time::Kind::Utc
-    # end
+    private def time(value)
+      Time.new value, Time::Kind::Utc
+    end
+
+    private def win_to_unix_epoch(filetime : LibWindows::FILETIME)
+      winticks = (filetime.dwHighDateTime.to_u64 << 32) | filetime.dwLowDateTime.to_u64
+      # winticks start in 1601. unix in 1970.
+      timespec = uninitialized LibC::Timespec
+      timespec.tv_sec = (winticks / 10_000_000i64) - 11644473600i64
+      timespec.tv_nsec = (winticks % 10_000_000) * 10
+      timespec
+    end
   end
 end

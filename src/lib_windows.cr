@@ -102,6 +102,7 @@ lib LibWindows
   fun find_close = FindClose(file: Handle) : BOOL
   fun get_file_attributes = GetFileAttributesA(filename : UInt8*) : DWord;
   fun get_file_size_ex = GetFileSizeEx(file : Handle, size : UInt64*) : BOOL
+  fun get_file_time = GetFileTime(file : Handle, lpCreationTime : FILETIME*, lpLastAccessTime : FILETIME*, lpLastWriteTime : FILETIME*) : BOOL
   fun set_file_pointer = SetFilePointer(file : Handle, lDistanceToMove : Long, lpDistanceToMoveHigh : Long*, dwMoveMethod : DWord) : DWord
   fun set_end_of_file = SetEndOfFile(file : Handle) : BOOL
   fun delete_file = DeleteFileA(filename : UInt8*) : BOOL
