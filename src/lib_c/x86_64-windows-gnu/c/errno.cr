@@ -1,4 +1,6 @@
 lib LibC
+  # FIXME: need to check values for windows
+  
   E2BIG           =   7
   EACCES          =  13
   EADDRINUSE      =  98
