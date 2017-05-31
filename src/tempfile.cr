@@ -33,15 +33,37 @@ require "c/stdlib"
 # ```
 class Tempfile < IO::FileDescriptor
   # Creates a `Tempfile` with the given filename.
-  def initialize(name)
-    tmpdir = self.class.dirname + File::SEPARATOR
-    @path = "#{tmpdir}#{name}.XXXXXX"
-    fileno = LibC.mkstemp(@path)
-    if fileno == -1
-      raise Errno.new("mkstemp")
+  {% if flag?(:windows) %}
+    def initialize(name)
+      tmpdir = self.class.dirname
+      @path = String.new(260) do | buffer |
+        if 0 == LibWindows.get_temp_file_name(tmpdir.check_no_null_byte, "", 0, name.check_no_null_byte)
+          raise WinError.new("get_temp_file_name")
+        end
+        len = LibC.strlen(buffer)
+        {len, len}
+      end
+        
+      access = LibWindows::GENERIC_READ | LibWindows::GENERIC_WRITE
+      creation = LibWindows::CREATE_ALWAYS
+      flags = LibWindows::FILE_FLAG_OVERLAPPED
+      handle = LibWindows.create_file(@path.check_no_null_byte, access, 0, nil, creation, flags, nil)
+      if handle == LibWindows::INVALID_HANDLE_VALUE
+        raise WinError.new("TempFIle")
+      end
+      super(handle, blocking: true)
     end
-    super(fileno, blocking: true)
-  end
+  {% else %}
+    def initialize(name)
+      tmpdir = self.class.dirname + File::SEPARATOR
+      @path = "#{tmpdir}#{name}.XXXXXX"
+      fileno = LibC.mkstemp(@path)
+      if fileno == -1
+        raise Errno.new("mkstemp")
+      end
+      super(fileno, blocking: true)
+    end
+  {% end %}
 
   # Retrieves the full path of a this tempfile.
   #
@@ -75,11 +97,22 @@ class Tempfile < IO::FileDescriptor
   # Tempfile.dirname # => "/tmp"
   # ```
   def self.dirname : String
-    unless tmpdir = ENV["TMPDIR"]?
-      tmpdir = "/tmp"
-    end
-    tmpdir = tmpdir + File::SEPARATOR unless tmpdir.ends_with? File::SEPARATOR
-    File.dirname(tmpdir)
+    {% if flag?(:winsows) %}
+      tmpdir = String.new(260) do |buffer|
+        len = LibWindows.get_full_path_name(buf, 260)
+        if len == 0 || len > 260
+          raise WinError.new("Error resolving temp dir")
+        end
+        {len, len}
+      end
+      File.dirname(tmpdir)
+    {% else %}
+      unless tmpdir = ENV["TMPDIR"]?
+        tmpdir = "/tmp"
+      end
+      tmpdir = tmpdir + File::SEPARATOR unless tmpdir.ends_with? File::SEPARATOR
+      File.dirname(tmpdir)
+    {% end %}
   end
 
   # Deletes this tempfile.

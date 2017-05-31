@@ -60,6 +60,7 @@ lib LibWindows
   fun set_current_directory = SetCurrentDirectoryA(path : UInt8*) : BOOL
   fun create_directory = CreateDirectoryA(path : UInt8*, security_attribute : Void*): BOOL
   fun remove_directory = RemoveDirectoryA(path : UInt8*) : BOOL
+  fun get_temp_path = GetTempPath(len : DWord, buffer : UInt8*) : DWord
 
   MAX_PATH = 260
 
@@ -110,7 +111,8 @@ lib LibWindows
   # from Shlwapi.lib
   # fun path_file_dir_exists = PathFileExistsA(path : UInt8*) : BOOL
   fun move_file = MoveFileA(lpExistingFileName : UInt8*, lpNewFileName : UInt8*) : BOOL
-  
+  fun get_temp_file_name = GetTempFileName(path_name : UInt8*, prefix : UInt8*, unique_num : UInt32, temp_file_name : UInt8*) : UInt32
+
   fun create_io_completion_port = CreateIoCompletionPort(file : Handle, port : Handle, data : Void*, threads : DWord) : Handle
   fun get_queued_completion_status = GetQueuedCompletionStatus(port : Handle, bytes_transfered : DWord*, data : Void**, entry : Overlapped**, timeout_millis : DWord) : Bool
   fun post_queued_completion_status = PostQueuedCompletionStatus(port : Handle, bytes_transfered : DWord, data : Void*, entry : Overlapped*) : Bool
