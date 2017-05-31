@@ -107,9 +107,16 @@ module FileUtils
   def cp(src_path : String, dest : String)
     File.open(src_path) do |s|
       dest += File::SEPARATOR + File.basename(src_path) if Dir.exists?(dest)
-      File.open(dest, "wb", s.stat.mode) do |d|
-        IO.copy(s, d)
-      end
+      {% if flag?(:windows) %}
+        # FIXME what to do with permission in windows?
+        File.open(dest, "wb") do |d|
+          IO.copy(s, d)
+        end
+      {% else %}
+        File.open(dest, "wb", s.stat.mode) do |d|
+          IO.copy(s, d)
+        end
+      {% end %}
     end
   end
 
