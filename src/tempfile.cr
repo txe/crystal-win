@@ -37,15 +37,14 @@ class Tempfile < IO::FileDescriptor
     def initialize(name)
       tmpdir = self.class.dirname
       @path = String.new(260) do | buffer |
-        if 0 == LibWindows.get_temp_file_name(tmpdir.check_no_null_byte, "", 0, name.check_no_null_byte)
+        if 0 == LibWindows.get_temp_file_name(tmpdir.check_no_null_byte, name.check_no_null_byte, 0, buffer)
           raise WinError.new("get_temp_file_name")
         end
         len = LibC.strlen(buffer)
         {len, len}
       end
-        
       access = LibWindows::GENERIC_READ | LibWindows::GENERIC_WRITE
-      creation = LibWindows::CREATE_ALWAYS
+      creation = LibWindows::OPEN_EXISTING
       flags = LibWindows::FILE_FLAG_OVERLAPPED
       handle = LibWindows.create_file(@path.check_no_null_byte, access, 0, nil, creation, flags, nil)
       if handle == LibWindows::INVALID_HANDLE_VALUE
@@ -97,9 +96,9 @@ class Tempfile < IO::FileDescriptor
   # Tempfile.dirname # => "/tmp"
   # ```
   def self.dirname : String
-    {% if flag?(:winsows) %}
+    {% if flag?(:windows) %}
       tmpdir = String.new(260) do |buffer|
-        len = LibWindows.get_full_path_name(buf, 260)
+        len = LibWindows.get_temp_path(260, buffer)
         if len == 0 || len > 260
           raise WinError.new("Error resolving temp dir")
         end
