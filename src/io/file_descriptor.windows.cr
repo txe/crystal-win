@@ -151,11 +151,24 @@ class IO::FileDescriptor
   end
 
   private def unbuffered_read(slice : Bytes)
+    # when we each the end of file in async IO
+    # we never come from Scheduler.reschedule (LibWindows.get_queued_completion_status)
+    # https://msdn.microsoft.com/en-us/library/windows/desktop/aa365690(v=vs.85).aspx
+    # on wine, actually, everything is ok, maybe because of WinError::ERROR_HANDLE_EOF
+    # so check the length
+    if LibWindows.get_file_type(@handle) == LibWindows::FILE_TYPE_DISK
+      if @pos >= LibWindows.get_file_size(@handle, nil)
+        return 0
+      end
+    end
+
     overlapped = Pointer(LibWindows::Overlapped).malloc
     overlapped.value = LibWindows::Overlapped.new
     overlapped.value.offset = @pos
     LibWindows.read_file(@handle, slice.pointer(slice.size), slice.size, out bytes_read, overlapped)
+    
     status = LibWindows.get_last_error
+    LibWindows.set_last_error 0
     if status == WinError::ERROR_IO_PENDING
       @overlappeds[overlapped] = Fiber.current
       Scheduler.reschedule
@@ -183,6 +196,8 @@ class IO::FileDescriptor
       overlapped = Pointer(LibWindows::Overlapped).malloc
       overlapped.value = LibWindows::Overlapped.new
       overlapped.value.offset = @pos
+      
+      LibWindows.set_last_error 0  
       LibWindows.write_file(@handle, slice.pointer(count), count, out bytes_written, overlapped)
       status = LibWindows.get_last_error
       if status == WinError::ERROR_IO_PENDING
