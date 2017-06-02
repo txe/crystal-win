@@ -165,7 +165,7 @@ describe "Semantic: SimpleRescues" do
       CR
     ,
       <<-CR
-      begin
+      (begin
         begin
           lorem
         rescue ___e2
@@ -176,8 +176,9 @@ describe "Semantic: SimpleRescues" do
       rescue ___e1
         qux
         ::raise(___e1)
+      end).tap do
+        qux
       end
-      qux
       CR
     )
   end
@@ -193,13 +194,14 @@ describe "Semantic: SimpleRescues" do
       CR
     ,
       <<-CR
-      begin
+      (begin
         lorem
       rescue ___e1
         qux
         ::raise(___e1)
+      end).tap do
+        qux
       end
-      qux
       CR
     )
   end
