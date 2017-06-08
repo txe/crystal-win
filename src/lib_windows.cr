@@ -46,7 +46,7 @@ lib LibWindows
   struct SecurityAttributes
     length : DWord
     security_descriptors : Void*
-    inherit_handle : Bool
+    inherit_handle : BOOL
   end
 
   fun get_std_handle = GetStdHandle(std_handle : DWord) : Handle
@@ -120,7 +120,7 @@ lib LibWindows
   fun get_current_process = GetCurrentProcess : Handle
   fun get_current_thread = GetCurrentThread : Handle
   fun create_pipe = CreatePipe(hReadPipe : UInt64*, hWritePipe : UInt64*, lpPipeAttributes : SecurityAttributes*, nSize : DWord) : BOOL
-
+  fun peek_named_pipe = PeekNamedPipe(hNamedPipe : Handle, lpBuffer : UInt8*, nBufferSize : DWord, lpBytesRead : DWord*, lpTotalBytesAvail : DWord*, lpBytesLeftThisMessage : DWord*) : BOOL
 
   WAIT_ABANDONED = 0x00000080_u32
   WAIT_OBJECT_0  = 0x00000000_u32
@@ -133,6 +133,48 @@ lib LibWindows
   fun get_last_error = GetLastError : DWord
   fun set_last_error = SetLastError(code : DWord) : Void
 
+  # StartupInfoA.deFlags
+  STARTF_USESTDHANDLES = 0x00000100_u32
+
+  # CreateProcessA.dwCreationFlags
+  NORMAL_PRIORITY_CLASS = 0x00000020_u32
+  CREATE_NO_WINDOW = 0x08000000_u32
+
+  struct StartupInfoA
+    cb : DWord
+    lpReserved : UInt8*
+    lpDesktop : UInt8*
+    lpTitle : UInt8*
+    dwX : DWord
+    dwY : DWord
+    dwXSize : DWord
+    dwYSize : DWord
+    dwXCountChars : DWord
+    dwYCountChars : DWord
+    dwFillAttribute : DWord
+    dwFlags : DWord
+    wShowWindow : Word
+    cbReserved2 : Word
+    lpReserved2: UInt8*
+    hStdInput : Handle
+    hStdOutput : Handle
+    hStdError : Handle
+  end
+
+  struct Process_Information
+    hProcess : Handle
+    hThread : Handle
+    dwProcessId : DWord
+    dwThreadId : DWord
+  end
+  
+  fun create_process = CreateProcessA(lpApplicationName : UInt8*, lpCommandLine : UInt8*, 
+                                      lpProcessAttributes : SecurityAttributes*, lpThreadAttributes : SecurityAttributes*, bInheritHandles : BOOL,
+                                      dwCreationFlags : DWord, lpEnvironment : Void*, lpCurrentDirectory : UInt8*, 
+                                      lpStartupInfo : StartupInfoA*, lpProcessInformation : Process_Information*) : BOOL
+  fun kill_process = KillProcess(hProcess : Handle, uExitCode : UInt32) : BOOL
+  fun get_exit_code_process = GetExitCodeProcess(hProcess : Handle, lpExitCode : DWord*) : BOOL
+  
   FORMAT_MESSAGE_ALLOCATE_BUFFER = 0x00000100_u32
   FORMAT_MESSAGE_IGNORE_INSERTS  = 0x00000200_u32
   FORMAT_MESSAGE_FROM_STRING     = 0x00000400_u32

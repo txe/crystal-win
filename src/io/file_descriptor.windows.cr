@@ -150,7 +150,29 @@ class IO::FileDescriptor
     pp.text inspect
   end
 
+  private def unbuffered_read_pipe(slice : Bytes)
+    # unnamed pipes can't be attached to_completion_port so have to use the loop
+    # wait when data appears
+    loop do
+      if 0 == LibWindows.peek_named_pipe(@handle, nil, 0, nil, out byte_aval, nil)
+        status = LibWindows.get_last_error
+        # pipe has been ended
+        return 0 if status == WinError::ERROR_BROKEN_PIPE 
+        raise WinError.new "PeekNamedPipe", status
+      end
+      break if byte_aval != 0
+      sleep 0.1
+    end
+
+    LibWindows.read_file(@handle, slice.pointer(slice.size), slice.size, out bytes_read, nil)
+    bytes_read
+  end
+
   private def unbuffered_read(slice : Bytes)
+    if LibWindows.get_file_type(@handle) == LibWindows::FILE_TYPE_PIPE
+      return unbuffered_read_pipe(slice)
+    end
+
     # when we each the end of file in async IO
     # we never come from Scheduler.reschedule (LibWindows.get_queued_completion_status)
     # https://msdn.microsoft.com/en-us/library/windows/desktop/aa365690(v=vs.85).aspx
@@ -166,7 +188,7 @@ class IO::FileDescriptor
     overlapped.value = LibWindows::Overlapped.new
     overlapped.value.offset = @pos
     LibWindows.read_file(@handle, slice.pointer(slice.size), slice.size, out bytes_read, overlapped)
-    
+
     status = LibWindows.get_last_error
     LibWindows.set_last_error 0
     if status == WinError::ERROR_IO_PENDING

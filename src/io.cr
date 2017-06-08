@@ -159,9 +159,14 @@ module IO
 
       {r, w}
     {% else %}
+      sa = LibWindows::SecurityAttributes.new
+      sa.length = sizeof(typeof(sa));
+      sa.security_descriptors = nil;
+      sa.inherit_handle = 1; # important when pipe is given to CreateProcess
+
       pipe_1 : UInt64 = 0_u64
       pipe_2 : UInt64 = 0_u64
-      if (LibWindows.create_pipe(pointerof(pipe_1), pointerof(pipe_2), nil, 0) == 0)
+      if (LibWindows.create_pipe(pointerof(pipe_1), pointerof(pipe_2), pointerof(sa), 0) == 0)
         raise WinError.new("Could not create pipe")
       end
 
