@@ -221,8 +221,6 @@ class Process
 
     if needs_pipe?(output)
       process_output, child_output = IO.pipe(write_blocking: true)
-      pp process_output
-      pp child_output
       if output
         @wait_count += 1
         spawn { copy_io(process_output, output, channel, close_src: true) }
@@ -434,7 +432,6 @@ end
 # ```
 def `(command) : String
     process = Process.new(command, shell: true, input: true, output: nil, error: true)
-    pp process
     output = process.output.gets_to_end
     status = process.wait
     $? = status
