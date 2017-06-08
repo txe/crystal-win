@@ -12,9 +12,9 @@ class Process
   # not run any handlers registered with `at_exit`, use `::exit` for that.
   #
   # *status* is the exit status of the current process.
-  # def self.exit(status = 0)
-  #   LibC.exit(status)
-  # end
+  def self.exit(status = 0)
+    LibC.exit(status)
+  end
 
   # Returns the process identifier of the current process.
   # def self.pid : LibC::PidT
@@ -151,11 +151,11 @@ class Process
   # Executes a process and waits for it to complete.
   #
   # By default the process is configured without input, output or error.
-  # def self.run(command : String, args = nil, env : Env = nil, clear_env : Bool = false, shell : Bool = false, input : Stdio = false, output : Stdio = false, error : Stdio = false, chdir : String? = nil) : Process::Status
-  #   status = new(command, args, env, clear_env, shell, input, output, error, chdir).wait
-  #   $? = status
-  #   status
-  # end
+  def self.run(command : String, args = nil, env : Env = nil, clear_env : Bool = false, shell : Bool = false, input : Stdio = false, output : Stdio = false, error : Stdio = false, chdir : String? = nil) : Process::Status
+    status = new(command, args, env, clear_env, shell, input, output, error, chdir).wait
+    $? = status
+    status
+  end
 
   # Executes a process, yields the block, and then waits for it to finish.
   #
@@ -302,6 +302,7 @@ class Process
       end
       @wait_count = 0
 
+      # maybe we can attach handle to IOCP so we wouldn't block whole process
       if LibWindows.wait_for_single_object(@proc_info.hProcess, LibWindows::INFINITY) != LibWindows::WAIT_OBJECT_0
         raise WinError.new "WaitForSingleObject"
       end
