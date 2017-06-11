@@ -323,16 +323,26 @@ module Crystal
             end
           end
 
-          codegen_process = fork do
-            pipe_w = pw
+          # FIXME condegen_many_units - fork
+          {% if flag?(:windows) %}
             slice.each do |unit|
               unit.compile
-              if pipe_w && unit.reused_previous_compilation?
-                pipe_w.puts unit.name
+              if pw && unit.reused_previous_compilation?
+                pw.puts unit.name
               end
             end
-          end
-          codegen_process.wait
+          {% else %}
+            codegen_process = fork do
+              pipe_w = pw
+              slice.each do |unit|
+                unit.compile
+                if pipe_w && unit.reused_previous_compilation?
+                  pipe_w.puts unit.name
+                end
+              end
+            end
+            codegen_process.wait
+          {% end %}
 
           if pipe_w = pw
             pipe_w.close

@@ -163,17 +163,17 @@ class Process
   # will be closed automatically at the end of the block.
   #
   # Returns the block's value.
-  # def self.run(command : String, args = nil, env : Env = nil, clear_env : Bool = false, shell : Bool = false, input : Stdio = nil, output : Stdio = nil, error : Stdio = nil, chdir : String? = nil)
-  #   process = new(command, args, env, clear_env, shell, input, output, error, chdir)
-  #   begin
-  #     value = yield process
-  #     $? = process.wait
-  #     value
-  #   rescue ex
-  #     process.kill
-  #     raise ex
-  #   end
-  # end
+  def self.run(command : String, args = nil, env : Env = nil, clear_env : Bool = false, shell : Bool = false, input : Stdio = nil, output : Stdio = nil, error : Stdio = nil, chdir : String? = nil)
+    process = new(command, args, env, clear_env, shell, input, output, error, chdir)
+    begin
+      value = yield process
+      $? = process.wait
+      value
+    rescue ex
+      process.kill
+      raise ex
+    end
+  end
 
   # Replaces the current process with a new one.
   #
@@ -187,7 +187,7 @@ class Process
   # end
 
   # Process info
-  @proc_info : LibWindows::Process_Information
+  @proc_info : LibWindows::Process_Information?
   @proc_status : Process::Status?
 
   # A pipe to this process's input. Raises if a pipe wasn't asked when creating the process.
@@ -288,13 +288,17 @@ class Process
   # See also: `Process.kill`
   def kill
     # FIXME when do we need to clean up handles?
-    LibWindows.kill_process(@proc_info.hProcess, -1) if @proc_info
+    if p = @proc_info
+      LibWindows.kill_process(p.hProcess, -1)
+    end
     nil
   end
 
   # Waits for this process to complete and closes any pipes.
-  def wait : Process::Status
+  def wait : Process::Status      
     if @proc_status.nil?
+      raise WinError.new "@proc_info == nil" if @proc_info.nil?
+
       close_io @input # only closed when a pipe was created but not managed by copy_io
       @wait_count.times do
         ex = channel.receive
@@ -302,11 +306,11 @@ class Process
       end
       @wait_count = 0
 
-      # maybe we can attach handle to IOCP so we wouldn't block whole process
-      if LibWindows.wait_for_single_object(@proc_info.hProcess, LibWindows::INFINITY) != LibWindows::WAIT_OBJECT_0
+      # FIXME: maybe we can attach handle to IOCP so we wouldn't block whole process
+      if LibWindows.wait_for_single_object(@proc_info.try &.hProcess, LibWindows::INFINITY) != LibWindows::WAIT_OBJECT_0
         raise WinError.new "WaitForSingleObject"
       end
-      if LibWindows.get_exit_code_process(@proc_info.hProcess, out exit_code) == 0
+      if LibWindows.get_exit_code_process(@proc_info.try &.hProcess, out exit_code) == 0
         raise WinError.new "GetExitCodeProcess"
       end
 
@@ -325,7 +329,7 @@ class Process
 
   # Whether this process is already terminated.
   def terminated?
-    @proc_info.nil?
+    @proc_nil.nil?
   end
 
   # Closes any pipes to the child process.
@@ -333,12 +337,11 @@ class Process
     close_io @input
     close_io @output
     close_io @error
-    if @proc_info.hProcess != LibWindows::INVALID_HANDLE_VALUE
-      LibWindows.close_handle(@proc_info.hProcess)
-      LibWindows.close_handle(@proc_info.hThread)
-      @proc_info.hProcess = LibWindows::INVALID_HANDLE_VALUE
-      @proc_info.hThread = LibWindows::INVALID_HANDLE_VALUE
+    if @proc_info && @proc_info.try &.hProcess != LibWindows::INVALID_HANDLE_VALUE
+      LibWindows.close_handle(@proc_info.try &.hProcess)
+      LibWindows.close_handle(@proc_info.try &.hThread)
     end
+    @proc_info = nil
   end
 
   # :nodoc:
@@ -416,11 +419,11 @@ end
 # ```text
 # LICENSE shard.yml Readme.md spec src
 # ```
-# def system(command : String, args = nil) : Bool
-#   status = Process.run(command, args, shell: true, input: true, output: true, error: true)
-#   $? = status
-#   status.success?
-# end
+def system(command : String, args = nil) : Bool
+  status = Process.run(command, args, shell: true, input: true, output: true, error: true)
+  $? = status
+  status.success?
+end
 
 # Returns the standard output of executing *command* in a subshell.
 # Standard input, and error are inherited.
