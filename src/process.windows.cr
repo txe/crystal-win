@@ -17,13 +17,9 @@ class Process
   end
 
   # Returns the process identifier of the current process.
-  # def self.pid : LibC::PidT
-  #   {% if flag?(:windows) %}
-  #     raise Exception.new("getpid is not implemented")
-  #   {% else %}
-  #     LibC.getpid
-  #   {% end %}
-  # end
+  def self.pid : LibWindows::Handle
+    LibWindows.get_current_process
+  end
 
   # Returns the process group identifier of the current process.
   # def self.pgid : LibC::PidT
