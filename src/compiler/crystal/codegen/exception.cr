@@ -49,7 +49,13 @@ class Crystal::CodeGenVisitor
       #   # ex_type_id = extract_value lp, 1
 
       catch_body = new_block "catch.body"
-      cs = builder.catch_switch(nil, old_rescue_block || LLVM::BasicBlock.null, 1)
+      # if @catch_pad is not nil then this rescue block is inner
+      # http://llvm.org/docs/ExceptionHandling.html#funclet-parent-tokens
+      if c = @catch_pad
+        cs = builder.catch_switch(c, old_rescue_block || LLVM::BasicBlock.null, 1)
+      else
+        cs = builder.catch_switch(nil, old_rescue_block || LLVM::BasicBlock.null, 1)
+      end
       builder.add_handler cs, catch_body
       position_at_end catch_body
 
